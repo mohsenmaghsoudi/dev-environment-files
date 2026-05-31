@@ -21,6 +21,7 @@ return {
         "helm_ls",
         "bashls",
         "ansiblels",
+        -- "csharp_ls",
         "omnisharp",
         "yamlls",
         "dockerls",
