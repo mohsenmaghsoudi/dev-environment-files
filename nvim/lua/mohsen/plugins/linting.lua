@@ -11,10 +11,21 @@ return {
       typescriptreact = { "eslint_d" },
       svelte = { "eslint_d" },
       python = { "flake8" },
+      -- Go
+      go = { "golangcilint" },
+    }
+
+    -- golangci-lint v2 parser
+    local golangcilint = lint.linters.golangcilint
+    golangcilint.args = {
+      "run",
+      "--output.json.path=stdout",
+      "--output.text.path=stderr",
+      "--show-stats=false",
+      "--default=standard",
     }
 
     local lint_augroup = vim.api.nvim_create_augroup("lint", { clear = true })
-
     vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "InsertLeave" }, {
       group = lint_augroup,
       callback = function()
@@ -22,7 +33,8 @@ return {
       end,
     })
 
-    vim.keymap.set("n", "<leader>l", function()
+    -- <leader>ll موجود بود، حفظ می‌کنیم
+    vim.keymap.set("n", "<leader>ll", function()
       lint.try_lint()
     end, { desc = "Trigger linting for current file" })
   end,

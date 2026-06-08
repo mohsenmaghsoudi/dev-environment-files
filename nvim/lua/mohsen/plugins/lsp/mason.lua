@@ -2,7 +2,6 @@ return {
   {
     "williamboman/mason-lspconfig.nvim",
     opts = {
-      -- list of servers for mason to install
       ensure_installed = {
         "ts_ls",
         "html",
@@ -17,14 +16,12 @@ return {
         "ruff",
         "gopls",
         "jsonls",
-        "hydra_lsp",
         "helm_ls",
         "bashls",
         "ansiblels",
-        -- "csharp_ls",
-        "omnisharp",
         "yamlls",
         "dockerls",
+        -- roslyn از mason-lspconfig نیست، با :RoslynInstall نصب می‌شه
       },
     },
     dependencies = {
@@ -47,20 +44,24 @@ return {
     "WhoIsSethDaniel/mason-tool-installer.nvim",
     opts = {
       ensure_installed = {
-        "prettier", -- prettier formatter
-        "stylua", -- lua formatter
-        "isort", -- python formatter
-        "black", -- python formatter
-        --        "pylint", -- python linter
+        "prettier",
+        "stylua",
+        "isort",
+        "black",
         "flake8",
-        "eslint_d", -- js linter
-        "csharpier",
+        "eslint_d",
         "ruff",
-        "netcoredbg", -- .NET debugger
+        -- Go
+        "delve",
+        "golangci-lint",
+        "gofumpt",
+        "goimports",
+        -- C#
+        "netcoredbg", -- debugger
+        -- "csharpier",   -- formatter
+        "csharpier", --formatter
       },
     },
-    dependencies = {
-      "williamboman/mason.nvim",
-    },
+    dependencies = { "williamboman/mason.nvim" },
   },
 }

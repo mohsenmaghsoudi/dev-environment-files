@@ -1,87 +1,38 @@
-local parsers = {
-  "json",
-  "javascript",
-  "typescript",
-  "tsx",
-  "yaml",
-  "html",
-  "css",
-  "markdown",
-  "markdown_inline",
-  "svelte",
-  "graphql",
-  "bash",
-  "lua",
-  "vim",
-  "dockerfile",
-  "gitignore",
-  "query",
-  "vimdoc",
-  "c",
-  "python",
-  "go",
-  "gomod",
-  "gosum",
-  "c_sharp",
-}
-
-for _, lang in ipairs(parsers) do
-  local ok = pcall(vim.treesitter.language.inspect, lang)
-  if not ok then
-    vim.notify("Installing treesitter parser: " .. lang, vim.log.levels.INFO)
-    pcall(function()
-      vim.cmd("TSInstall " .. lang)
-    end)
-  end
-end
-
--- highlight
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = "*",
-  callback = function(ev)
-    local ok = pcall(vim.treesitter.start, ev.buf)
-    if not ok then
-    end
-  end,
-})
-
--- indentation با treesitter
-vim.api.nvim_create_autocmd("FileType", {
-  pattern = {
-    "javascript",
-    "typescript",
-    "tsx",
-    "jsx",
-    "lua",
-    "python",
-    "go",
-    "c_sharp",
-    "cs",
-    "html",
-    "css",
-    "json",
-    "yaml",
-  },
-  callback = function()
-    vim.bo.indentexpr = "v:lua.require'nvim.treesitter'.indentexpr()"
-  end,
-})
-
--- incremental selection
-vim.keymap.set("n", "<C-space>", function()
-  vim.cmd("normal! viw")
-end, { desc = "Start selection" })
-
 return {
-  {
+  "nvim-treesitter/nvim-treesitter",
+  event = { "BufReadPre", "BufNewFile" },
+  build = ":TSUpdate",
+  dependencies = {
     "windwp/nvim-ts-autotag",
-    event = { "BufReadPre", "BufNewFile" },
-    opts = {
-      opts = {
-        enable_close = true,
-        enable_rename = true,
-        enable_close_on_slash = true,
+  },
+  opts = {
+    ensure_installed = {
+      "json", "javascript", "typescript", "tsx", "yaml",
+      "html", "css", "prisma", "markdown", "markdown_inline",
+      "svelte", "graphql", "bash", "lua", "vim", "dockerfile",
+      "gitignore", "query", "vimdoc", "c", "python",
+      "go", "gomod", "gosum", "c_sharp",
+    },
+    highlight = { enable = true },
+    indent    = { enable = true },
+    incremental_selection = {
+      enable  = true,
+      keymaps = {
+        init_selection    = "<C-space>",
+        node_incremental  = "<C-space>",
+        scope_incremental = false,
+        node_decremental  = "<bs>",
       },
     },
   },
+  config = function(_, opts)
+    require("nvim-treesitter").setup(opts)
+    require("nvim-ts-autotag").setup({
+      opts = {
+        enable_close          = true,
+        enable_rename         = true,
+        enable_close_on_slash = true,
+      },
+    })
+  end,
 }
