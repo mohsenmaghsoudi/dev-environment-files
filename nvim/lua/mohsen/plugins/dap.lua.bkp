@@ -1,6 +1,5 @@
 -- lua/mohsen/plugins/dap.lua
 -- شامل: Go (Delve) + C# (.NET / netcoredbg)
-
 return {
   {
     "mfussenegger/nvim-dap",
@@ -15,9 +14,9 @@ return {
       local dap = require("dap")
       local dapui = require("dapui")
 
-      -- =============================================
-      -- Go / Delve Configuration
-      -- =============================================
+      -- ──────────────────────────────────────────────
+      -- Go / Delve
+      -- ──────────────────────────────────────────────
       require("dap-go").setup({
         delve = {
           path = vim.fn.stdpath("data") .. "/mason/bin/dlv",
@@ -54,23 +53,21 @@ return {
         },
       })
 
-      -- Go specific keymaps
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "go",
         callback = function()
           vim.keymap.set("n", "<leader>Go", function()
             require("dap-go").debug_test()
           end, { desc = "DAP Go: Debug Test", buffer = true })
-
           vim.keymap.set("n", "<leader>GL", function()
             require("dap-go").debug_last_test()
           end, { desc = "DAP Go: Debug Last Test", buffer = true })
         end,
       })
 
-      -- =============================================
-      -- C# / .NET Configuration
-      -- =============================================
+      -- ──────────────────────────────────────────────
+      -- C# / .NET  (netcoredbg)
+      -- ──────────────────────────────────────────────
       dap.adapters.coreclr = {
         type = "executable",
         command = vim.fn.stdpath("data") .. "/mason/bin/netcoredbg",
@@ -90,11 +87,11 @@ return {
             end, result)
             if #result == 1 then
               return result[1]
-            end
-            if #result > 1 then
+            elseif #result > 1 then
               return vim.fn.input("Path to dll: ", result[1], "file")
+            else
+              return vim.fn.input("Path to dll: ", cwd .. "/bin/Debug/", "file")
             end
-            return vim.fn.input("Path to dll: ", cwd .. "/bin/Debug/", "file")
           end,
           cwd = "${workspaceFolder}",
           stopAtEntry = false,
@@ -123,6 +120,7 @@ return {
             ASPNETCORE_ENVIRONMENT = "Development",
             ASPNETCORE_URLS = "http://localhost:5000",
           },
+          args = {},
         },
         {
           type = "coreclr",
@@ -142,11 +140,11 @@ return {
         },
       }
 
-      -- C# specific keymaps
+      -- Keymaps C# DAP
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "cs",
         callback = function()
-          vim.keymap.set("n", "<leader>Co", dap.continue, { desc = "C# DAP: Continue", buffer = true })
+          vim.keymap.set("n", "<leader>Co", dap.continue, { desc = "C# DAP: Start/Continue", buffer = true })
           vim.keymap.set(
             "n",
             "<leader>Cb",
@@ -156,9 +154,9 @@ return {
         end,
       })
 
-      -- =============================================
-      -- DAP UI + Virtual Text
-      -- =============================================
+      -- ──────────────────────────────────────────────
+      -- DAP UI
+      -- ──────────────────────────────────────────────
       dapui.setup({
         icons = { expanded = "▾", collapsed = "▸", current_frame = "▸" },
         mappings = {
@@ -209,30 +207,30 @@ return {
 
       require("nvim-dap-virtual-text").setup({
         enabled = true,
+        enabled_commands = true,
         highlight_changed_variables = true,
+        highlight_new_as_changed = false,
         show_stop_reason = true,
+        commented = false,
         virt_text_pos = "eol",
       })
 
-      -- =============================================
+      -- ──────────────────────────────────────────────
       -- Keymaps عمومی DAP
-      -- =============================================
+      -- ──────────────────────────────────────────────
       local map = function(keys, func, desc)
         vim.keymap.set("n", keys, func, { desc = "DAP: " .. desc })
       end
 
-      -- Function Keys
       map("<F5>", dap.continue, "Continue / Start")
       map("<F10>", dap.step_over, "Step Over")
       map("<F11>", dap.step_into, "Step Into")
       map("<S-F11>", dap.step_out, "Step Out")
       map("<F9>", dap.toggle_breakpoint, "Toggle Breakpoint")
 
-      -- Leader Keymaps
       map("<leader>db", function()
         dap.set_breakpoint(vim.fn.input("Breakpoint condition: "))
       end, "Conditional Breakpoint")
-
       map("<leader>dB", function()
         dap.set_breakpoint(nil, nil, vim.fn.input("Log message: "))
       end, "Log Breakpoint")
@@ -241,7 +239,7 @@ return {
       map("<leader>dR", dap.run_last, "Run Last")
       map("<leader>dq", dap.terminate, "Terminate")
       map("<leader>dc", dap.clear_breakpoints, "Clear All Breakpoints")
-      map("<leader>du", dapui.toggle, "Toggle DAP UI")
+      map("<leader>du", dapui.toggle, "Toggle UI")
       map("<leader>de", function()
         dapui.eval(nil, { enter = true })
       end, "Evaluate Expression")
