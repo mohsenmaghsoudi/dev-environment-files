@@ -1,7 +1,12 @@
 -- after/lsp/gopls.lua
+-- ══════════════════════════════════════════════════════════════
+--  تنظیمات سرور gopls (با vim.lsp.config مرج می‌شود)
+--  capabilities سراسری از plugins/lsp/lsp.lua می‌آید.
+-- ══════════════════════════════════════════════════════════════
 return {
   settings = {
     gopls = {
+      -- ── آنالیزها (staticcheck + موارد مفید اضافه) ──
       analyses = {
         unusedparams      = true,
         unusedvariable    = true,
@@ -12,6 +17,9 @@ return {
         useany            = true,
         fieldalignment    = false, -- پر سر و صداست؛ در صورت نیاز روشن کن
       },
+      staticcheck = true,
+
+      -- ── inlay hints (با <leader>Gh قابل toggle) ──
       hints = {
         assignVariableTypes    = true,
         compositeLiteralFields = true,
@@ -21,15 +29,24 @@ return {
         parameterNames         = true,
         rangeVariableTypes     = true,
       },
-      completeUnimported = true,
-      usePlaceholders    = true,
-      staticcheck        = true,
-      gofumpt            = true,
+
+      -- ── تکمیل و hover ──
+      completeUnimported = true,   -- پکیج‌های import‌نشده هم در autocomplete
+      usePlaceholders    = true,   -- پر کردن پارامترها هنگام تکمیل تابع
+      gofumpt            = true,    -- سبک سخت‌گیرانه‌تر فرمت
       semanticTokens     = true,
-      -- گروه‌بندی import های local؛ prefix را با ماژول پروژه‌ات عوض کن
-      -- ["local"] = "your.module/path",
-      vulncheck          = "Imports",
-      directoryFilters   = { "-.git", "-node_modules", "-vendor" },
+      hoverKind          = "FullDocumentation",
+      completionDocumentation = true,
+
+      -- گروه‌بندی import های داخلی پروژه:
+      -- prefix را با مسیر ماژول پروژه‌ات (همان خط module در go.mod) عوض کن
+      -- ["local"] = "github.com/you/yourmodule",
+
+      -- ── امنیت و کارایی ──
+      vulncheck        = "Imports",
+      directoryFilters = { "-.git", "-node_modules", "-vendor", "-bin" },
+
+      -- ── code lens ها (run/test/tidy/… بالای کد) ──
       codelenses = {
         gc_details         = true,
         generate           = true,
