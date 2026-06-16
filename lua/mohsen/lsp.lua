@@ -32,7 +32,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
     keymap.set("n", "<leader>D", "<cmd>Telescope diagnostics bufnr=0<CR>", opts) -- show  diagnostics for file
 
     opts.desc = "Show line diagnostics"
-    keymap.set("n", "<leader>d", vim.diagnostic.open_float, opts) -- show diagnostics for line
+    keymap.set("n", "gl", vim.diagnostic.open_float, opts) -- show diagnostics for line (gl چون <leader>d با کلیدهای DAP تداخل داشت)
 
     opts.desc = "Go to previous diagnostic"
     keymap.set("n", "[d", function()
@@ -65,4 +65,98 @@ vim.diagnostic.config({
       [severity.INFO] = " ",
     },
   },
+})
+
+-- ══════════════════════════════════════════════════════════════
+-- Roslyn (C#) — keymaps و features
+-- چون نسخه جدید roslyn.nvim دیگر on_attach نمی‌پذیرد، اینجا با یک
+-- autocmd مستقل LspAttach که فقط روی client روسلین فعال می‌شود،
+-- کلیدها را ست می‌کنیم. اینطوری مطمئناً اجرا می‌شوند.
+-- ══════════════════════════════════════════════════════════════
+vim.api.nvim_create_autocmd("LspAttach", {
+  group = vim.api.nvim_create_augroup("RoslynKeymaps", { clear = true }),
+  callback = function(ev)
+    local client = vim.lsp.get_client_by_id(ev.data.client_id)
+    if not client or client.name ~= "roslyn" then
+      return
+    end
+
+    local bufnr = ev.buf
+
+    local map = function(keys, func, desc)
+      vim.keymap.set("n", keys, func, { buffer = bufnr, desc = "C#: " .. desc })
+    end
+
+    -- ────────────────────────────────────────────────
+    -- اول keymap ها را می‌سازیم تا اگر بخش‌های بعدی (code lens / inlay)
+    -- به هر دلیلی ارور دادند، کلیدها همچنان ساخته شده باشند.
+    -- ────────────────────────────────────────────────
+
+    -- Toggle inlay hints
+    map("<leader>Ch", function()
+      vim.lsp.inlay_hint.enable(
+        not vim.lsp.inlay_hint.is_enabled({ bufnr = bufnr }),
+        { bufnr = bufnr }
+      )
+    end, "Toggle Inlay Hints")
+
+    -- اجرای code lens — اگر به command مخصوص VS Code خورد (مثل
+    -- peekReferences) به‌جای ارور قرمز، references را با Telescope باز کن
+    map("<leader>CL", function()
+      local ok, err = pcall(vim.lsp.codelens.run)
+      if not ok and tostring(err):match("peekReferences") then
+        vim.cmd("Telescope lsp_references")
+      end
+    end, "Run Code Lens")
+
+    -- Fix All
+    map("<leader>Cf", function()
+      vim.lsp.buf.code_action({
+        context = { only = { "source.fixAll" } },
+        apply   = true,
+      })
+    end, "Fix All")
+
+    -- Organize imports — اکشن «remove unnecessary usings» را خودکار اعمال
+    -- می‌کند. عمداً «Fix All» را رد می‌کنیم تا فقط همین فایل تمیز شود و
+    -- یک اکشن منحصر بماند (وگرنه منوی انتخاب باز می‌شود).
+    map("<leader>Ci", function()
+      vim.lsp.buf.code_action({
+        apply = true,
+        filter = function(a)
+          local t = (a.title or ""):lower()
+          if t:find("fix all") then
+            return false
+          end
+          return t:find("unnecessary") ~= nil
+            or t:find("using") ~= nil
+            or t:find("import") ~= nil
+            or t:find("organize") ~= nil
+        end,
+      })
+    end, "Organize Imports")
+
+    -- Restart Roslyn (دستور جدید؛ :Roslyn restart منسوخ شده)
+    map("<leader>Cs", "<cmd>lsp restart roslyn<cr>", "Restart Roslyn")
+
+    -- ────────────────────────────────────────────────
+    -- features: inlay hints و code lens
+    -- همه داخل pcall تا هیچ ارور/deprecation کل callback را نشکند.
+    -- codelens.refresh بدون آرگومان صدا زده می‌شود (فرم {bufnr} منسوخ شده).
+    -- ────────────────────────────────────────────────
+
+    -- Inlay hints روشن به‌صورت پیش‌فرض
+    pcall(vim.lsp.inlay_hint.enable, true, { bufnr = bufnr })
+
+    -- Code lens: refresh خودکار
+    if client:supports_method("textDocument/codeLens") then
+      pcall(vim.lsp.codelens.refresh)
+      vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost", "CursorHold" }, {
+        buffer   = bufnr,
+        callback = function()
+          pcall(vim.lsp.codelens.refresh)
+        end,
+      })
+    end
+  end,
 })

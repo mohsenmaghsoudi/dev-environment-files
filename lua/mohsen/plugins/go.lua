@@ -81,48 +81,4 @@ return {
       })
     end,
   },
-
-  -- ────────────────────────────────────────────────────────────
-  -- Neotest
-  -- ────────────────────────────────────────────────────────────
-  {
-    "nvim-neotest/neotest",
-    dependencies = {
-      "nvim-neotest/nvim-nio",
-      "nvim-lua/plenary.nvim",
-      "antoinemadec/FixCursorHold.nvim",
-      "nvim-treesitter/nvim-treesitter",
-      "fredrikaverpil/neotest-golang",
-    },
-    ft = { "go" },
-    config = function()
-      require("neotest").setup({
-        adapters = {
-          require("neotest-golang")({
-            go_test_args   = { "-v", "-race", "-count=1", "-timeout=60s" },
-            dap_go_enabled = true,
-          }),
-        },
-        output  = { enabled = true, open_on_run = "short" },
-        summary = { enabled = true, animated = true, follow = true, expand_errors = true },
-        status  = { enabled = true, signs = true, virtual_text = true },
-      })
-
-      local map = function(k, f, d)
-        vim.keymap.set("n", k, f, { desc = "Test: " .. d })
-      end
-
-      -- <leader>T برای test (T بزرگ تا با <leader>t tab conflict نداشته باشه)
-      map("<leader>Tt", function() require("neotest").run.run() end,                      "Run Nearest")
-      map("<leader>TT", function() require("neotest").run.run(vim.fn.expand("%")) end,     "Run File")
-      map("<leader>Ta", function() require("neotest").run.run(vim.fn.getcwd()) end,        "Run All")
-      map("<leader>Ts", function() require("neotest").summary.toggle() end,               "Toggle Summary")
-      map("<leader>To", function() require("neotest").output.open({ enter = true }) end,  "Show Output")
-      map("<leader>TO", function() require("neotest").output_panel.toggle() end,          "Toggle Output Panel")
-      map("<leader>TS", function() require("neotest").run.stop() end,                     "Stop")
-      map("<leader>Td", function()
-        require("neotest").run.run({ strategy = "dap" })
-      end, "Debug Nearest")
-    end,
-  },
 }

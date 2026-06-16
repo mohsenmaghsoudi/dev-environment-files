@@ -56,6 +56,10 @@ return {
         "golangci-lint",
         "gofumpt",
         "goimports",
+        "gomodifytags", -- GoAddTag / GoRmTag
+        "impl",         -- GoImpl
+        "gotests",      -- تولید جدول تست
+        "iferr",        -- GoIfErr
         -- C#
         "netcoredbg", -- debugger
         -- "csharpier",   -- formatter

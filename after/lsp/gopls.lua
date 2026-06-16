@@ -3,11 +3,14 @@ return {
   settings = {
     gopls = {
       analyses = {
-        unusedparams   = true,
-        unusedvariable = true,
-        nilness        = true,
-        shadow         = true,
-        httpresponse   = true,
+        unusedparams      = true,
+        unusedvariable    = true,
+        nilness           = true,
+        shadow            = true,
+        httpresponse      = true,
+        unusedwrite       = true,
+        useany            = true,
+        fieldalignment    = false, -- پر سر و صداست؛ در صورت نیاز روشن کن
       },
       hints = {
         assignVariableTypes    = true,
@@ -23,6 +26,10 @@ return {
       staticcheck        = true,
       gofumpt            = true,
       semanticTokens     = true,
+      -- گروه‌بندی import های local؛ prefix را با ماژول پروژه‌ات عوض کن
+      -- ["local"] = "your.module/path",
+      vulncheck          = "Imports",
+      directoryFilters   = { "-.git", "-node_modules", "-vendor" },
       codelenses = {
         gc_details         = true,
         generate           = true,
@@ -30,6 +37,7 @@ return {
         test               = true,
         tidy               = true,
         upgrade_dependency = true,
+        regenerate_cgo     = true,
       },
     },
   },

@@ -41,3 +41,33 @@ opt.splitbelow = true -- split horizontal window to the bottom
 
 -- turn off swapfile
 opt.swapfile = false
+
+-- ══════════════════════════════════════════════════════════════
+-- indentation per-language (Go = tab, C# = 4 spaces)
+-- default در بالا 2 space است؛ این‌ها فقط برای زبان‌های خاص override می‌شوند
+-- ══════════════════════════════════════════════════════════════
+local indent_grp = vim.api.nvim_create_augroup("UserIndentByFiletype", { clear = true })
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = indent_grp,
+  pattern = { "go", "gomod", "gowork", "gotmpl" },
+  callback = function()
+    -- Go از tab استفاده می‌کند (gofmt/gofumpt استاندارد)
+    vim.bo.expandtab = false
+    vim.bo.tabstop = 4
+    vim.bo.shiftwidth = 4
+    vim.bo.softtabstop = 4
+  end,
+})
+
+vim.api.nvim_create_autocmd("FileType", {
+  group = indent_grp,
+  pattern = { "cs" },
+  callback = function()
+    -- C# استاندارد 4 space (مطابق csharpier)
+    vim.bo.expandtab = true
+    vim.bo.tabstop = 4
+    vim.bo.shiftwidth = 4
+    vim.bo.softtabstop = 4
+  end,
+})
