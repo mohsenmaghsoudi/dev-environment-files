@@ -9,9 +9,18 @@ return {
     -- نسخه‌های قدیمی conform هنوز فرم قدیمی را صدا می‌زنند که باعث
     -- timeout می‌شود. اینجا formatter را با دستور درست تعریف می‌کنیم.
     -- مسیر mason را هم مستقیم می‌دهیم تا به PATH وابسته نباشد.
-    local mason_csharpier = vim.fn.stdpath("data") .. "/mason/bin/csharpier"
+    -- روی ویندوز پسوند .cmd/.exe خودکار بررسی می‌شود.
+    local function find_csharpier()
+      local base = vim.fn.stdpath("data") .. "/mason/bin/csharpier"
+      if vim.fn.has("win32") == 1 then
+        if vim.fn.executable(base .. ".cmd") == 1 then return base .. ".cmd" end
+        if vim.fn.executable(base .. ".exe") == 1 then return base .. ".exe" end
+      end
+      if vim.fn.executable(base) == 1 then return base end
+      return "csharpier" -- fallback به PATH
+    end
     conform.formatters.csharpier = {
-      command = vim.fn.executable(mason_csharpier) == 1 and mason_csharpier or "csharpier",
+      command = find_csharpier(),
       args = { "format", "--write-stdout" },
       stdin = true,
     }
@@ -42,6 +51,7 @@ return {
         cs = { "csharpier" },
       },
 
+      
       format_on_save = function(bufnr)
         -- برای C# تایم‌اوت بیشتر چون csharpier روی اجرای اول کند است
         local ft = vim.bo[bufnr].filetype
