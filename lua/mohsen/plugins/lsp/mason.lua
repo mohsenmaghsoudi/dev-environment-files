@@ -46,11 +46,9 @@ return {
       ensure_installed = {
         "prettier",
         "stylua",
-        "isort",
-        "black",
-        "flake8",
         "eslint_d",
         "ruff",
+        "debugpy",  -- دیباگ پایتون
         -- Go
         "delve",
         "golangci-lint",

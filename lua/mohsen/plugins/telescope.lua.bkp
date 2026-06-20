@@ -38,7 +38,7 @@
 -- }
 return {
 	"nvim-telescope/telescope.nvim",
-	-- branch حذف شد: 0.1.x با nvim 0.12 ناسازگار است (master لازم است)
+	branch = "0.1.x",
 	dependencies = {
 		"nvim-lua/plenary.nvim",
 		{ "nvim-telescope/telescope-fzf-native.nvim", build = "make" },

@@ -71,3 +71,15 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.bo.softtabstop = 4
   end,
 })
+
+-- Python: استاندارد PEP 8 → 4 space
+vim.api.nvim_create_autocmd("FileType", {
+  group = indent_grp,
+  pattern = { "python" },
+  callback = function()
+    vim.bo.expandtab = true
+    vim.bo.tabstop = 4
+    vim.bo.shiftwidth = 4
+    vim.bo.softtabstop = 4
+  end,
+})

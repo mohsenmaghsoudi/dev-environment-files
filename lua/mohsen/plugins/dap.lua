@@ -22,6 +22,7 @@ return {
       "theHamsta/nvim-dap-virtual-text",
       "williamboman/mason.nvim",
       "leoluz/nvim-dap-go",
+      "mfussenegger/nvim-dap-python",
     },
     config = function()
       local dap = require("dap")
@@ -140,6 +141,32 @@ return {
           end, { desc = "DAP Go: Debug Last Test", buffer = true })
         end,
       })
+
+      -- ══════════════════════════════════════════════════════════
+      -- ══════════════════════════════════════════════════════════
+      -- Python (debugpy)
+      -- ══════════════════════════════════════════════════════════
+      local debugpy_python = vim.fn.stdpath("data")
+        .. "/mason/packages/debugpy/venv/bin/python"
+      if vim.fn.has("win32") == 1 then
+        debugpy_python = vim.fn.stdpath("data")
+          .. "/mason/packages/debugpy/venv/Scripts/python.exe"
+      end
+      local ok_dappy = pcall(require, "dap-python")
+      if ok_dappy then
+        require("dap-python").setup(debugpy_python)
+        require("dap-python").test_runner = "pytest"
+        vim.api.nvim_create_autocmd("FileType", {
+          pattern = "python",
+          callback = function()
+            local dp = require("dap-python")
+            vim.keymap.set("n", "<leader>Pm", function() dp.test_method() end,
+              { desc = "Python DAP: Debug Method", buffer = true })
+            vim.keymap.set("n", "<leader>Pc", function() dp.test_class() end,
+              { desc = "Python DAP: Debug Class", buffer = true })
+          end,
+        })
+      end
 
       -- ══════════════════════════════════════════════════════════
       -- C# / .NET  (netcoredbg)

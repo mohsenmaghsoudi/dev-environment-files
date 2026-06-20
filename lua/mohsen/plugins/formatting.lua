@@ -42,7 +42,7 @@ return {
 
         lua = { "stylua" },
 
-        python = { "isort", "black" },
+        python = { "ruff_organize_imports", "ruff_format" },
 
         go = { "goimports", "gofumpt" },
         gomod = { "goimports" },
