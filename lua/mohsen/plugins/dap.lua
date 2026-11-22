@@ -1,17 +1,23 @@
 -- lua/mohsen/plugins/dap.lua
 -- ══════════════════════════════════════════════════════════════
---  Debug Adapter Protocol — Go (Delve) + C# / .NET (netcoredbg)
+--  Debug Adapter Protocol: Go (Delve) + Python (debugpy) + C# / .NET (netcoredbg)
 --
---  کلیدهای عمومی:
---    F5  ادامه/شروع   F9  breakpoint   F10 step over
---    F11 step into    S-F11 step out
---    <leader>d…  دستورات بیشتر (REPL، terminate، UI، …)
+--  Global keys (F-keys need fn on a Mac, so each has a leader equivalent):
+--    F5    continue / start
+--    F9    toggle breakpoint   <leader>dd
+--    F10   step over           <leader>dn
+--    F11   step into           <leader>di
+--    S-F11 step out            <leader>do
+--    <leader>dC  run to cursor
 --
---  Go:  <leader>Go دیباگ تست، <leader>GL دیباگ آخرین تست
---  C#:  <leader>Co ادامه،     <leader>Cb breakpoint
+--  Go:      <leader>Go debug test,   <leader>GL debug last test
+--  Python:  <leader>Pm test method,  <leader>Pc test class
+--  C#:      <leader>Co continue,     <leader>Cb toggle breakpoint
 --
---  پیش‌نیاز:
---    Go → delve (mason)        C# → netcoredbg (mason) + dotnet build
+--  Requirements:
+--    Go     -> delve (mason)
+--    Python -> debugpy (mason)
+--    C#     -> netcoredbg: :NetcoredbgInstall (Mason's package is broken)
 -- ══════════════════════════════════════════════════════════════
 return {
   {
@@ -27,10 +33,10 @@ return {
     config = function()
       local dap = require("dap")
       local dapui = require("dapui")
-      local mason = vim.fn.stdpath("data") .. "/mason/bin/"
+      local util = require("mohsen.dap_util")
 
       -- ────────────────────────────────────────────────────────
-      -- آیکن‌ها و رنگ نشانه‌های breakpoint
+      -- Breakpoint sign icons and colors
       -- ────────────────────────────────────────────────────────
       vim.fn.sign_define("DapBreakpoint", { text = "●", texthl = "DiagnosticError", linehl = "", numhl = "" })
       vim.fn.sign_define("DapBreakpointCondition", { text = "◆", texthl = "DiagnosticWarn", linehl = "", numhl = "" })
@@ -38,97 +44,11 @@ return {
       vim.fn.sign_define("DapStopped", { text = "▶", texthl = "DiagnosticOk", linehl = "Visual", numhl = "" })
       vim.fn.sign_define("DapBreakpointRejected", { text = "○", texthl = "DiagnosticError", linehl = "", numhl = "" })
 
-      -- ────────────────────────────────────────────────────────
-      -- helper: پیدا کردن dll اجرایی پروژه (نه تست)
-      -- با مدل coroutine ای nvim-dap سازگار است: اگر چند کاندید بود،
-      -- اجرای دیباگ را موقتاً نگه می‌دارد تا کاربر انتخاب کند.
-      -- ────────────────────────────────────────────────────────
-      local function find_dll()
-        local cwd = vim.fn.getcwd()
-        local all = vim.fn.glob(cwd .. "/**/bin/Debug/**/*.dll", true, true)
-
-        local function valid(f)
-          return f:match("%.dll$")
-            and not f:match("%.resources%.dll$")
-            and not f:match("/ref/")
-            and not f:match("/refint/")
-            and not f:match("/%._") -- فایل‌های مخفی macOS
-        end
-
-        -- خروجی اصلی پروژه‌ها (نه تست) را جمع می‌کنیم
-        local candidates = {}
-        for _, f in ipairs(all) do
-          if valid(f) and not f:match("%.Tests?%.dll$") then
-            local name = f:match("([^/]+)%.dll$")
-            if f:match("/" .. name .. "/bin/") then
-              table.insert(candidates, 1, f) -- خروجی اصلی پروژه → ابتدای لیست
-            else
-              table.insert(candidates, f)
-            end
-          end
-        end
-
-        if #candidates == 0 then
-          vim.notify("هیچ dll اجرایی پیدا نشد. اول: dotnet build", vim.log.levels.WARN)
-          return vim.fn.input("Path to dll: ", cwd .. "/bin/Debug/", "file")
-        end
-        if #candidates == 1 then
-          return candidates[1]
-        end
-
-        -- چند کاندید → از داخل coroutine با vim.ui.select انتخاب می‌کنیم
-        local co = coroutine.running()
-        if co then
-          vim.ui.select(candidates, {
-            prompt = "کدام پروژه را دیباگ کنم؟",
-            format_item = function(f)
-              return f:match("([^/]+)%.dll$") .. "   (" .. f:gsub(cwd .. "/", "") .. ")"
-            end,
-          }, function(choice)
-            coroutine.resume(co, choice or candidates[1])
-          end)
-          return coroutine.yield()
-        end
-
-        -- fallback اگر coroutine نبود
-        return candidates[1]
-      end
-
       -- ══════════════════════════════════════════════════════════
       -- Go / Delve
+      -- Options live in dap_util.go_opts so neotest-golang gets the same ones
       -- ══════════════════════════════════════════════════════════
-      require("dap-go").setup({
-        delve = {
-          path = mason .. "dlv",
-          initialize_timeout_sec = 20,
-          port = "${port}",
-          args = {},
-          build_flags = "",
-          detached = false, -- سازگار با WSL/Mac
-        },
-        dap_configurations = {
-          { type = "go", name = "Debug Current File", request = "launch", program = "${file}" },
-          { type = "go", name = "Debug Package", request = "launch", program = "${workspaceFolder}" },
-          {
-            type = "go",
-            name = "Debug Test",
-            request = "launch",
-            mode = "test",
-            program = "${file}",
-            buildFlags = "-cover",
-          },
-          {
-            type = "go",
-            name = "Debug with Args",
-            request = "launch",
-            program = "${workspaceFolder}",
-            args = function()
-              return vim.split(vim.fn.input("Args: "), " ")
-            end,
-          },
-          { type = "go", name = "Attach Remote", mode = "remote", request = "attach" },
-        },
-      })
+      require("dap-go").setup(util.go_opts())
 
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "go",
@@ -143,48 +63,150 @@ return {
       })
 
       -- ══════════════════════════════════════════════════════════
-      -- ══════════════════════════════════════════════════════════
       -- Python (debugpy)
+      -- The adapter runs with Mason's own debugpy (independent of the project);
+      -- the program itself runs with the project venv: the venv-selector choice
+      -- if there is one, otherwise VIRTUAL_ENV / .venv / venv (dap-python logic)
       -- ══════════════════════════════════════════════════════════
-      local debugpy_python = vim.fn.stdpath("data")
-        .. "/mason/packages/debugpy/venv/bin/python"
+      local debugpy_python = vim.fn.stdpath("data") .. "/mason/packages/debugpy/venv/bin/python"
       if vim.fn.has("win32") == 1 then
-        debugpy_python = vim.fn.stdpath("data")
-          .. "/mason/packages/debugpy/venv/Scripts/python.exe"
+        debugpy_python = vim.fn.stdpath("data") .. "/mason/packages/debugpy/venv/Scripts/python.exe"
       end
-      local ok_dappy = pcall(require, "dap-python")
+      local has_mason_debugpy = vim.fn.executable(debugpy_python) == 1
+      if not has_mason_debugpy then
+        -- fallback: system python (must have debugpy installed)
+        debugpy_python = vim.fn.exepath("python3")
+      end
+
+      local ok_dappy, dappy = pcall(require, "dap-python")
       if ok_dappy then
-        require("dap-python").setup(debugpy_python)
-        require("dap-python").test_runner = "pytest"
+        dappy.setup(debugpy_python)
+        dappy.test_runner = "pytest"
+
+        -- Extra config: also step into library code
+        table.insert(dap.configurations.python, {
+          type = "python",
+          request = "launch",
+          name = "Launch file (justMyCode=false)",
+          program = "${file}",
+          justMyCode = false,
+        })
+
+        vim.api.nvim_create_autocmd("FileType", {
+          pattern = "python",
+          once = true, -- warn only once
+          callback = function()
+            if not has_mason_debugpy then
+              vim.notify(
+                "debugpy is not installed in Mason: :MasonInstall debugpy\n(falling back to the system python3)",
+                vim.log.levels.WARN,
+                { title = "DAP Python" }
+              )
+            end
+          end,
+        })
         vim.api.nvim_create_autocmd("FileType", {
           pattern = "python",
           callback = function()
-            local dp = require("dap-python")
-            vim.keymap.set("n", "<leader>Pm", function() dp.test_method() end,
-              { desc = "Python DAP: Debug Method", buffer = true })
-            vim.keymap.set("n", "<leader>Pc", function() dp.test_class() end,
-              { desc = "Python DAP: Debug Class", buffer = true })
+            vim.keymap.set("n", "<leader>Pm", function()
+              dappy.test_method()
+            end, { desc = "Python DAP: Debug Method", buffer = true })
+            vim.keymap.set("n", "<leader>Pc", function()
+              dappy.test_class()
+            end, { desc = "Python DAP: Debug Class", buffer = true })
           end,
         })
       end
 
       -- ══════════════════════════════════════════════════════════
       -- C# / .NET  (netcoredbg)
+      -- The adapter is a function so that, if netcoredbg is missing, you get a
+      -- clear message instead of a vague error.
       -- ══════════════════════════════════════════════════════════
-      dap.adapters.coreclr = {
-        type = "executable",
-        command = mason .. "netcoredbg",
-        args = { "--interpreter=vscode" },
-      }
-      -- razor/blazor و فایل‌های دیگر هم همان adapter
+      dap.adapters.coreclr = function(callback)
+        local cmd = util.find_netcoredbg()
+        if not cmd then
+          vim.notify(
+            "netcoredbg not found.\nRun in nvim:  :NetcoredbgInstall",
+            vim.log.levels.ERROR,
+            { title = "DAP .NET" }
+          )
+          return
+        end
+        callback({ type = "executable", command = cmd, args = { "--interpreter=vscode" } })
+      end
+      -- Also register under the name netcoredbg (used by neotest-vstest)
       dap.adapters.netcoredbg = dap.adapters.coreclr
+
+      vim.api.nvim_create_user_command("NetcoredbgInstall", util.install_netcoredbg, {
+        desc = "Download and install netcoredbg (arm64) without Mason",
+      })
+
+      -- Find runnable dlls (not libraries, not tests); newest build first
+      local function find_dlls(cwd)
+        local out = {}
+        local rcs = vim.fn.glob(cwd .. "/**/bin/Debug/**/*.runtimeconfig.json", true, true)
+        for _, rc in ipairs(rcs) do
+          local dll = rc:gsub("%.runtimeconfig%.json$", ".dll")
+          local name = vim.fn.fnamemodify(dll, ":t:r")
+          local is_test = name:match("[Tt]ests?$") or name:match("%.Tests?%.") or name == "testhost"
+          if not is_test and vim.fn.filereadable(dll) == 1 then
+            table.insert(out, { path = dll, mtime = vim.fn.getftime(dll) })
+          end
+        end
+        table.sort(out, function(a, b)
+          return a.mtime > b.mtime
+        end)
+        return vim.tbl_map(function(x)
+          return x.path
+        end, out)
+      end
+
+      -- First dotnet build (async, nvim does not freeze), then pick a dll.
+      -- Uses nvim-dap's documented coroutine model.
+      local function dotnet_program()
+        return coroutine.create(function(dap_co)
+          local cwd = vim.fn.getcwd()
+          vim.notify("dotnet build …", vim.log.levels.INFO, { title = "DAP .NET" })
+
+          vim.system({ "dotnet", "build", "--nologo", "-v", "q" }, { text = true, cwd = cwd }, function(res)
+            vim.schedule(function()
+              if res.code ~= 0 then
+                vim.notify(
+                  "dotnet build failed:\n" .. (res.stdout or "") .. (res.stderr or ""),
+                  vim.log.levels.ERROR,
+                  { title = "DAP .NET" }
+                )
+                return coroutine.resume(dap_co, dap.ABORT)
+              end
+
+              local dlls = find_dlls(cwd)
+              if #dlls == 0 then
+                local p = vim.fn.input("Path to dll: ", cwd .. "/bin/Debug/", "file")
+                return coroutine.resume(dap_co, p ~= "" and p or dap.ABORT)
+              elseif #dlls == 1 then
+                return coroutine.resume(dap_co, dlls[1])
+              end
+
+              vim.ui.select(dlls, {
+                prompt = "Which project to debug?",
+                format_item = function(f)
+                  return vim.fn.fnamemodify(f, ":t:r") .. "   (" .. vim.fn.fnamemodify(f, ":.") .. ")"
+                end,
+              }, function(choice)
+                coroutine.resume(dap_co, choice or dap.ABORT)
+              end)
+            end)
+          end)
+        end)
+      end
 
       dap.configurations.cs = {
         {
           type = "coreclr",
           name = "Launch: Console / .NET App",
           request = "launch",
-          program = find_dll,
+          program = dotnet_program,
           cwd = "${workspaceFolder}",
           stopAtEntry = false,
           console = "integratedTerminal",
@@ -194,13 +216,14 @@ return {
           type = "coreclr",
           name = "Launch: ASP.NET Core",
           request = "launch",
-          program = find_dll,
+          program = dotnet_program,
           cwd = "${workspaceFolder}",
           stopAtEntry = false,
           console = "integratedTerminal",
           env = {
             ASPNETCORE_ENVIRONMENT = "Development",
-            ASPNETCORE_URLS = "http://localhost:5000",
+            -- Port 5000 is taken by AirPlay Receiver on macOS
+            ASPNETCORE_URLS = "http://localhost:5180",
           },
         },
         {
@@ -208,29 +231,17 @@ return {
           name = "Attach: .NET Process",
           request = "attach",
           processId = function()
-            local handle = io.popen("pgrep -la dotnet 2>/dev/null")
-            local out = handle and handle:read("*a") or ""
-            if handle then
-              handle:close()
-            end
-            if out ~= "" then
-              vim.notify("پروسه‌های dotnet در حال اجرا:\n" .. out, vim.log.levels.INFO)
-            end
-            return vim.fn.input("Process ID: ")
+            return require("dap.utils").pick_process({ filter = "dotnet" })
           end,
         },
       }
+      dap.configurations.fsharp = dap.configurations.cs
 
       vim.api.nvim_create_autocmd("FileType", {
         pattern = "cs",
         callback = function()
           vim.keymap.set("n", "<leader>Co", dap.continue, { desc = "C# DAP: Continue", buffer = true })
-          vim.keymap.set(
-            "n",
-            "<leader>Cb",
-            dap.toggle_breakpoint,
-            { desc = "C# DAP: Toggle Breakpoint", buffer = true }
-          )
+          vim.keymap.set("n", "<leader>Cb", dap.toggle_breakpoint, { desc = "C# DAP: Toggle Breakpoint", buffer = true })
         end,
       })
 
@@ -295,7 +306,7 @@ return {
         virt_text_pos = "eol",
       })
 
-      -- باز/بسته شدن خودکار UI
+      -- Open/close the UI automatically (also works for neotest debug runs)
       dap.listeners.after.event_initialized["dapui_config"] = function()
         dapui.open()
       end
@@ -307,7 +318,7 @@ return {
       end
 
       -- ══════════════════════════════════════════════════════════
-      -- Keymaps عمومی
+      -- Global keymaps
       -- ══════════════════════════════════════════════════════════
       local map = function(keys, func, desc)
         vim.keymap.set("n", keys, func, { desc = "DAP: " .. desc })
@@ -318,6 +329,13 @@ return {
       map("<F11>", dap.step_into, "Step Into")
       map("<S-F11>", dap.step_out, "Step Out")
       map("<F9>", dap.toggle_breakpoint, "Toggle Breakpoint")
+
+      -- Leader equivalents (F-keys often clash with system keys on a Mac)
+      map("<leader>dd", dap.toggle_breakpoint, "Toggle Breakpoint")
+      map("<leader>dn", dap.step_over, "Step Over (next)")
+      map("<leader>di", dap.step_into, "Step Into")
+      map("<leader>do", dap.step_out, "Step Out")
+      map("<leader>dC", dap.run_to_cursor, "Run to Cursor")
 
       map("<leader>db", function()
         dap.set_breakpoint(vim.fn.input("Breakpoint condition: "))

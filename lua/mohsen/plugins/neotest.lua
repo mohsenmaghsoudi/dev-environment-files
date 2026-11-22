@@ -1,13 +1,13 @@
 -- lua/mohsen/plugins/neotest.lua
 -- ══════════════════════════════════════════════════════════════
---  Neotest — Go، C# و Python
+--  Neotest: Go, C# and Python
 --
---  C#: از neotest-vstest (nsidorenco) استفاده می‌کنیم نه neotest-dotnet
---  قدیمیِ Issafalcon. آن adapter دیگر فعال نگهداری نمی‌شود و باگ
---  "Cannot call a sync function from non-async context" را داشت.
---  neotest-vstest با vstest کار می‌کند و آسنکرون‌سازی درست دارد.
+--  C#:     neotest-vstest (not the old neotest-dotnet). It is configured
+--          through vim.g.neotest_vstest, which must be set before require.
+--  Go:     neotest-golang (debugging via dap-go; delve options from dap_util)
+--  Python: neotest-python (uses venv-selector or the project venv)
 --
---  Go: همان neotest-golang.
+--  Debug a test: <leader>Td (uses the same adapters and nvim-dap)
 -- ══════════════════════════════════════════════════════════════
 return {
   {
@@ -17,60 +17,82 @@ return {
       "nvim-lua/plenary.nvim",
       "antoinemadec/FixCursorHold.nvim",
       "nvim-treesitter/nvim-treesitter",
+      "mfussenegger/nvim-dap",
       "fredrikaverpil/neotest-golang",
       "Nsidorenco/neotest-vstest",
       "nvim-neotest/neotest-python",
     },
+    -- Loads both when a file of these languages is opened (for the pass/fail
+    -- signs) and when a key is pressed (so the keys work from any file).
     ft = { "go", "cs", "python" },
+    keys = {
+      { "<leader>Tt", function() require("neotest").run.run() end, desc = "Test: Run Nearest" },
+      { "<leader>TT", function() require("neotest").run.run(vim.fn.expand("%")) end, desc = "Test: Run File" },
+      { "<leader>Ta", function() require("neotest").run.run(vim.fn.getcwd()) end, desc = "Test: Run All" },
+      { "<leader>Tl", function() require("neotest").run.run_last() end, desc = "Test: Run Last" },
+      { "<leader>Td", function() require("neotest").run.run({ strategy = "dap" }) end, desc = "Test: Debug Nearest" },
+      { "<leader>TS", function() require("neotest").run.stop() end, desc = "Test: Stop" },
+      { "<leader>Ts", function() require("neotest").summary.toggle() end, desc = "Test: Toggle Summary" },
+      { "<leader>To", function() require("neotest").output.open({ enter = true }) end, desc = "Test: Show Output" },
+      { "<leader>TO", function() require("neotest").output_panel.toggle() end, desc = "Test: Toggle Output Panel" },
+      { "<leader>Tw", function() require("neotest").watch.toggle(vim.fn.expand("%")) end, desc = "Test: Watch File" },
+      { "]T", function() require("neotest").jump.next({ status = "failed" }) end, desc = "Test: Next Failed" },
+      { "[T", function() require("neotest").jump.prev({ status = "failed" }) end, desc = "Test: Prev Failed" },
+    },
     config = function()
-      -- تنظیمات neotest-vstest باید قبل از require ست شود
+      local util = require("mohsen.dap_util")
+
+      -- C#: must be set before require("neotest-vstest")
       vim.g.neotest_vstest = {
-        dap_settings = { type = "netcoredbg" },
+        -- netcoredbg, using the adapter defined in dap.lua
+        dap_settings = { type = "netcoredbg", justMyCode = false },
       }
 
-      -- adapter ها را با pcall ایزوله می‌سازیم تا اگر یکی خطا داد،
-      -- بقیه (Go و C#) سالم بمانند.
+      -- Each adapter is built separately so one failure does not break the
+      -- others, and errors are reported instead of swallowed.
       local adapters = {}
-      local ok_go, go_a = pcall(function()
+      local function add(name, builder)
+        local ok, res = pcall(builder)
+        if ok and res then
+          table.insert(adapters, res)
+        else
+          vim.notify(name .. ": " .. tostring(res), vim.log.levels.WARN, { title = "neotest" })
+        end
+      end
+
+      add("neotest-golang", function()
         return require("neotest-golang")({
-          go_test_args   = { "-v", "-race", "-count=1", "-timeout=60s" },
-          dap_go_enabled = true,
+          -- gotestsum gives nicer output; falls back to plain go test
+          -- (install: go install gotest.tools/gotestsum@latest)
+          runner = vim.fn.executable("gotestsum") == 1 and "gotestsum" or "go",
+          -- -race is slow and needs CGO; add it when you need it
+          go_test_args = { "-v", "-count=1", "-timeout=60s" },
+          -- Debug via dap-go, with the same delve options as dap.lua
+          dap_mode = "dap-go",
+          dap_go_opts = function()
+            return util.go_opts()
+          end,
         })
       end)
-      if ok_go then table.insert(adapters, go_a) end
 
-      local ok_cs, cs_a = pcall(require, "neotest-vstest")
-      if ok_cs then table.insert(adapters, cs_a) end
+      add("neotest-vstest", function()
+        return require("neotest-vstest")
+      end)
 
-      local ok_py, py_a = pcall(function()
+      add("neotest-python", function()
         return require("neotest-python")({
           runner = "pytest",
+          python = util.python_for_tests,
           dap = { justMyCode = false },
         })
       end)
-      if ok_py then table.insert(adapters, py_a) end
 
       require("neotest").setup({
         adapters = adapters,
-        output  = { enabled = true, open_on_run = "short" },
+        output = { enabled = true, open_on_run = "short" },
         summary = { enabled = true, animated = true, follow = true, expand_errors = true },
-        status  = { enabled = true, signs = true, virtual_text = true },
+        status = { enabled = true, signs = true, virtual_text = true },
       })
-
-      local map = function(k, f, d)
-        vim.keymap.set("n", k, f, { desc = "Test: " .. d })
-      end
-
-      map("<leader>Tt", function() require("neotest").run.run() end,                     "Run Nearest")
-      map("<leader>TT", function() require("neotest").run.run(vim.fn.expand("%")) end,    "Run File")
-      map("<leader>Ta", function() require("neotest").run.run(vim.fn.getcwd()) end,       "Run All")
-      map("<leader>Ts", function() require("neotest").summary.toggle() end,              "Toggle Summary")
-      map("<leader>To", function() require("neotest").output.open({ enter = true }) end, "Show Output")
-      map("<leader>TO", function() require("neotest").output_panel.toggle() end,         "Toggle Output Panel")
-      map("<leader>TS", function() require("neotest").run.stop() end,                    "Stop")
-      map("<leader>Td", function()
-        require("neotest").run.run({ strategy = "dap" })
-      end, "Debug Nearest")
     end,
   },
 }

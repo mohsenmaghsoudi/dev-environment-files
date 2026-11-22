@@ -21,7 +21,7 @@ return {
         "ansiblels",
         "yamlls",
         "dockerls",
-        -- roslyn از mason-lspconfig نیست، با :RoslynInstall نصب می‌شه
+        -- roslyn is not in mason-lspconfig; install it with :RoslynInstall
       },
     },
     dependencies = {
@@ -48,7 +48,7 @@ return {
         "stylua",
         "eslint_d",
         "ruff",
-        "debugpy",  -- دیباگ پایتون
+        "debugpy",  -- Python debugger
         -- Go
         "delve",
         "golangci-lint",
@@ -56,12 +56,12 @@ return {
         "goimports",
         "gomodifytags", -- GoAddTag / GoRmTag
         "impl",         -- GoImpl
-        "gotests",      -- تولید جدول تست
+        "gotests",      -- table-driven test generator
         "iferr",        -- GoIfErr
         -- C#
-        "netcoredbg", -- debugger
-        -- "csharpier",   -- formatter
-        "csharpier", --formatter
+        -- netcoredbg is intentionally not here: Mason requests the old asset
+        -- (osx-amd64.tar.gz) and gets a 404. Run in nvim:  :NetcoredbgInstall
+        "csharpier", -- formatter
       },
     },
     dependencies = { "williamboman/mason.nvim" },
