@@ -1,76 +1,104 @@
--- lua/mohsen/plugins/treesitter.lua
--- ══════════════════════════════════════════════════════════════
---  nvim-treesitter — شاخه‌ی main (سازگار با Neovim 0.12)
---  شاخه‌ی master فریز شده و با 0.12 کار نمی‌کند.
---  API جدید: نصب پارسر دست خودمان، highlight/indent با autocmd.
--- ══════════════════════════════════════════════════════════════
+-- return {
+--   "nvim-treesitter/nvim-treesitter",
+--   event = { "BufReadPre", "BufNewFile" },
+--   build = ":TSUpdate",
+--   dependencies = {
+--     "windwp/nvim-ts-autotag",
+--   },
+--   config = function()
+--     require("nvim-treesitter").setup()
+--
+--     vim.treesitter.language.register("go", "go")
+--
+--     -- ensure_installed
+--     local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
+--     _ = parser_config -- suppress unused warning
+--
+--     require("nvim-treesitter.install").ensure_installed({
+--       "json", "javascript", "typescript", "tsx", "yaml",
+--       "html", "css", "prisma", "markdown", "markdown_inline",
+--       "svelte", "graphql", "bash", "lua", "vim", "dockerfile",
+--       "gitignore", "query", "vimdoc", "c", "python",
+--       "go", "gomod", "gosum", "c_sharp",
+--     })
+--
+--     -- autotag
+--     require("nvim-ts-autotag").setup({
+--       opts = {
+--         enable_close       = true,
+--         enable_rename      = true,
+--         enable_close_on_slash = true,
+--       },
+--     })
+--
+--     -- incremental selection
+--     vim.keymap.set("n", "<C-space>", function()
+--       vim.cmd("normal! viw")
+--     end, { desc = "Start selection" })
+--   end,
+-- }
 return {
-	{
-		"nvim-treesitter/nvim-treesitter",
-		branch = "main",
-		build = ":TSUpdate",
-		event = { "BufReadPre", "BufNewFile" },
-		dependencies = {
-			"windwp/nvim-ts-autotag",
-		},
-		config = function()
-			require("nvim-treesitter").setup({})
-
-			-- لیست پارسرهای موردنیاز
-			local ensure_installed = {
-				"json",
-				"javascript",
-				"typescript",
-				"tsx",
-				"yaml",
-				"html",
-				"css",
-				"prisma",
-				"markdown",
-				"markdown_inline",
-				"svelte",
-				"graphql",
-				"bash",
-				"lua",
-				"vim",
-				"dockerfile",
-				"gitignore",
-				"query",
-				"vimdoc",
-				"c",
-				"python",
-				"go",
-				"gomod",
-				"gosum",
-				"c_sharp",
-			}
-
-			-- فقط پارسرهایی که هنوز نصب نیستند را نصب کن
-			local already = require("nvim-treesitter.config").get_installed()
-			local to_install = vim.iter(ensure_installed)
-				:filter(function(p)
-					return not vim.tbl_contains(already, p)
-				end)
-				:totable()
-			if #to_install > 0 then
-				require("nvim-treesitter").install(to_install)
-			end
-
-			-- روشن کردن highlight و indent با FileType (API جدید)
-			vim.api.nvim_create_autocmd("FileType", {
-				callback = function()
-					pcall(vim.treesitter.start)
-					vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
-				end,
-			})
-
-			require("nvim-ts-autotag").setup({
-				opts = {
-					enable_close = true,
-					enable_rename = true,
-					enable_close_on_slash = true,
-				},
-			})
-		end,
+	"nvim-treesitter/nvim-treesitter",
+	branch = "main",
+	lazy = false, -- این پلاگین از lazy-load پشتیبانی نمی‌کند
+	build = ":TSUpdate",
+	dependencies = {
+		"windwp/nvim-ts-autotag",
 	},
+	config = function()
+		require("nvim-treesitter").setup()
+
+		-- نصب پارسرها (async است و پارسرهای نصب‌شده را رد می‌کند)
+		require("nvim-treesitter").install({
+			"json",
+			"javascript",
+			"typescript",
+			"tsx",
+			"yaml",
+			"html",
+			"css",
+			"prisma",
+			"markdown",
+			"markdown_inline",
+			"svelte",
+			"graphql",
+			"bash",
+			"lua",
+			"vim",
+			"dockerfile",
+			"gitignore",
+			"query",
+			"vimdoc",
+			"c",
+			"python",
+			"go",
+			"gomod",
+			"gosum",
+			"c_sharp",
+		})
+
+		-- فعال‌سازی هایلایت و ایندنت برای هر فایل
+		vim.api.nvim_create_autocmd("FileType", {
+			callback = function(args)
+				local ok = pcall(vim.treesitter.start, args.buf)
+				if ok then
+					vim.bo[args.buf].indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+				end
+			end,
+		})
+
+		-- autotag
+		require("nvim-ts-autotag").setup({
+			opts = {
+				enable_close = true,
+				enable_rename = true,
+				enable_close_on_slash = true,
+			},
+		})
+
+		-- incremental selection (Neovim 0.12+ بصورت پیش‌فرض: van / vin)
+		vim.keymap.set("n", "<C-space>", function()
+			vim.cmd("normal! viw")
+		end, { desc = "Start selection" })
+	end,
 }
